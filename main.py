@@ -1,6 +1,7 @@
 import sys
 from core.speaker import speak
 from core.listener import listen
+from core.brain import ask_ai
 from modules.os_control import open_app, set_volume, lock_system
 from modules.system_stats import get_battery_status, get_system_stats
 from modules.web_tools import search_google, play_youtube, open_website
@@ -56,8 +57,10 @@ def process_command(command: str):
         speak("Shutting down E.V. systems. Goodbye!")
         sys.exit()
 
+    # --- 7. Fallback to Groq AI Brain ---
     else:
-        speak("Command not recognized in local modules yet.")
+        response = ask_ai(command)
+        speak(response)
 
 def main():
     speak("E.V. Virtual Assistant online. Give me a command!")
