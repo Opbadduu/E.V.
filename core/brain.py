@@ -2,13 +2,10 @@ import os
 import sys
 from groq import Groq
 
-# Ensure root directory is in python path
+# Add root directory to path so we can import config cleanly
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import ASSISTANT_NAME
+from config import ASSISTANT_NAME, GROQ_API_KEY
 from utils.network import is_online
-
-# Fetch key from environment
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 def ask_ai(prompt: str) -> str:
     """
@@ -25,7 +22,7 @@ def ask_ai(prompt: str) -> str:
         
         system_instruction = (
             f"You are {ASSISTANT_NAME}, an intelligent desktop voice assistant inspired by JARVIS. "
-            "Keep your answers brief, clear, and direct (1 to 2 sentences maximum) so they are suitable for speaking out loud."
+            "Provide complete, accurate, and helpful responses. Keep formatting clean and easy to speak."
         )
         
         response = client.chat.completions.create(
