@@ -1,3 +1,8 @@
-.env
+# Ignore local database and personal data files
+data/
+notes/
+*.json
+
+# Ignore cache & environment
 __pycache__/
-*.pyc
+.env

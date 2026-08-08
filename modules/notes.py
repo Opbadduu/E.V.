@@ -1,152 +1,121 @@
 import os
-import sys
-import datetime
+import json
+from datetime import datetime
 
-# Ensure root directory is in path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "workspace.json")
 
-# Directory to store notes and tasks
-NOTES_DIR = os.path.join(os.path.dirname(__file__), "..", "notes")
-os.makedirs(NOTES_DIR, exist_ok=True)
+def _load_data() -> dict:
+    """Loads workspace data from JSON file."""
+    if not os.path.exists(DATA_FILE):
+        os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+        default_data = {"tasks": [], "notes": []}
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_data, f, indent=4)
+        return default_data
 
-NOTES_FILE = os.path.join(NOTES_DIR, "saved_notes.txt")
-TASKS_FILE = os.path.join(NOTES_DIR, "todo_list.txt")
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"tasks": [], "notes": []}
 
 
-def save_note(note_text: str) -> str:
-    """Appends a timestamped note to saved_notes.txt."""
-    if not note_text:
+def _save_data(data: dict) -> None:
+    """Saves workspace data to JSON file."""
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
+
+def add_task(title: str, due_time: str = "") -> str:
+    """Adds a task with optional due time."""
+    if not title:
+        return "Task title cannot be empty, boss."
+
+    data = _load_data()
+    task_id = len(data["tasks"]) + 1
+    new_task = {
+        "id": task_id,
+        "title": title.strip(),
+        "status": "pending",
+        "time": due_time.strip() if due_time else "Unspecified",
+        "created_at": datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    }
+    data["tasks"].append(new_task)
+    _save_data(data)
+
+    msg = f"Added task #{task_id}: '{title.strip()}'"
+    if due_time:
+        msg += f" for {due_time.strip()}"
+    return msg + "."
+
+
+def get_pending_tasks() -> str:
+    """Retrieves all pending tasks."""
+    data = _load_data()
+    pending = [t for t in data["tasks"] if t["status"] == "pending"]
+
+    if not pending:
+        return "You have no pending tasks, boss."
+
+    lines = [f"You have {len(pending)} pending task(s):"]
+    for t in pending:
+        time_info = f" (Scheduled: {t['time']})" if t['time'] != "Unspecified" else ""
+        lines.append(f"• #{t['id']}: {t['title']}{time_info}")
+
+    return "\n".join(lines)
+
+
+def complete_task(identifier: str) -> str:
+    """Marks a task as completed by ID or matching title."""
+    data = _load_data()
+    updated = False
+
+    for t in data["tasks"]:
+        if str(t["id"]) == str(identifier) or identifier.lower() in t["title"].lower():
+            if t["status"] == "pending":
+                t["status"] = "completed"
+                updated = True
+                break
+
+    if updated:
+        _save_data(data)
+        return f"Marked task matching '{identifier}' as completed!"
+    return f"No pending task matching '{identifier}' was found, boss."
+
+
+def clear_all_tasks() -> str:
+    """Clears all tasks."""
+    data = _load_data()
+    data["tasks"] = []
+    _save_data(data)
+    return "All tasks have been cleared from your database, boss."
+
+
+def save_note(content: str) -> str:
+    """Saves a timestamped note."""
+    if not content:
         return "Note content cannot be empty, boss."
 
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
-    entry = f"[{timestamp}] {note_text.strip()}\n"
+    data = _load_data()
+    note_id = len(data["notes"]) + 1
+    new_note = {
+        "id": note_id,
+        "content": content.strip(),
+        "created_at": datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    }
+    data["notes"].append(new_note)
+    _save_data(data)
+    return f"Note #{note_id} saved: '{content.strip()}'"
 
-    try:
-        with open(NOTES_FILE, "a", encoding="utf-8") as f:
-            f.write(entry)
-        return f"Got it, boss. Note saved: '{note_text.strip()}'"
-    except Exception as e:
-        return f"Failed to save note: {e}"
 
-
-def read_notes() -> str:
-    """Reads all saved notes."""
-    if not os.path.exists(NOTES_FILE) or os.path.getsize(NOTES_FILE) == 0:
+def get_notes() -> str:
+    """Retrieves all saved notes."""
+    data = _load_data()
+    if not data["notes"]:
         return "You don't have any saved notes yet, boss."
 
-    try:
-        with open(NOTES_FILE, "r", encoding="utf-8") as f:
-            notes = f.readlines()
-
-        output = "Here are your saved notes:\n" + "".join(notes[-5:])
-        return output.strip()
-    except Exception as e:
-        return f"Failed to read notes: {e}"
-
-
-def clear_all_notes() -> str:
-    """Deletes all saved notes."""
-    if not os.path.exists(NOTES_FILE) or os.path.getsize(NOTES_FILE) == 0:
-        return "You have no saved notes to delete, boss."
-
-    try:
-        open(NOTES_FILE, "w", encoding="utf-8").close()
-        return "All saved notes have been deleted, boss."
-    except Exception as e:
-        return f"Failed to delete notes: {e}"
-
-
-def add_task(task_text: str) -> str:
-    """Adds a task to the to-do list."""
-    if not task_text:
-        return "Task content cannot be empty, boss."
-
-    try:
-        with open(TASKS_FILE, "a", encoding="utf-8") as f:
-            f.write(f"- [ ] {task_text.strip()}\n")
-        return f"Added to your to-do list: '{task_text.strip()}'"
-    except Exception as e:
-        return f"Failed to add task: {e}"
-
-
-def read_pending_tasks() -> str:
-    """Reads and lists only the incomplete/pending tasks."""
-    if not os.path.exists(TASKS_FILE) or os.path.getsize(TASKS_FILE) == 0:
-        return "You have no tasks on your list, boss."
-
-    try:
-        with open(TASKS_FILE, "r", encoding="utf-8") as f:
-            tasks = f.readlines()
-
-        pending = [t.strip() for t in tasks if t.strip().startswith("- [ ]")]
-
-        if not pending:
-            return "You're all caught up! There are no pending tasks, boss."
-
-        count = len(pending)
-        formatted_list = "\n".join(pending)
-        return f"You have {count} pending task{'s' if count > 1 else ''}:\n{formatted_list}"
-
-    except Exception as e:
-        return f"Failed to check pending tasks: {e}"
-
-
-def mark_task_done(task_keyword: str) -> str:
-    """Marks a task matching the keyword as completed ([x])."""
-    if not os.path.exists(TASKS_FILE) or os.path.getsize(TASKS_FILE) == 0:
-        return "Your to-do list is empty, boss."
-
-    try:
-        with open(TASKS_FILE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        updated = False
-        new_lines = []
-        for line in lines:
-            if task_keyword.lower() in line.lower() and line.startswith("- [ ]"):
-                new_lines.append(line.replace("- [ ]", "- [x]"))
-                updated = True
-            else:
-                new_lines.append(line)
-
-        if updated:
-            with open(TASKS_FILE, "w", encoding="utf-8") as f:
-                f.writelines(new_lines)
-            return f"Marked task matching '{task_keyword}' as completed!"
-        else:
-            return f"No pending task matching '{task_keyword}' was found, boss."
-
-    except Exception as e:
-        return f"Failed to update task: {e}"
-
-
-def delete_task_by_keyword(keyword: str) -> str:
-    """Deletes a specific task matching the keyword."""
-    if not os.path.exists(TASKS_FILE) or os.path.getsize(TASKS_FILE) == 0:
-        return "Your to-do list is already empty, boss."
-
-    try:
-        with open(TASKS_FILE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        new_lines = [line for line in lines if keyword.lower() not in line.lower()]
-
-        if len(new_lines) == len(lines):
-            return f"No task matching '{keyword}' was found to delete, boss."
-
-        with open(TASKS_FILE, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-
-        return f"Successfully deleted task matching '{keyword}', boss."
-
-    except Exception as e:
-        return f"Failed to delete task: {e}"
-
-
-def clear_tasks() -> str:
-    """Clears the entire to-do list."""
-    try:
-        open(TASKS_FILE, "w", encoding="utf-8").close()
-        return "Your to-do list has been cleared, boss."
-    except Exception as e:
-        return f"Failed to clear tasks: {e}"
+    lines = ["Here are your saved notes:"]
+    for n in data["notes"][-5:]:  # Last 5 notes
+        lines.append(f"• [{n['created_at']}] #{n['id']}: {n['content']}")
+    return "\n".join(lines)

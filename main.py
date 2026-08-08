@@ -2,72 +2,79 @@ import sys
 from core.speaker import speak
 from core.listener import listen
 from core.brain import ask_ai
+from core.intent_router import parse_and_execute
 from modules.os_control import open_app, set_volume, lock_system
 from modules.system_stats import get_battery_status, get_system_stats
 from modules.web_tools import search_google, play_youtube, open_website
+from modules.notes import get_pending_tasks
 
-def process_command(command: str):
+def process_command(command: str) -> str | None:
     if not command:
-        return
+        return None
 
     print(f"\n⚡ Processing command: '{command}'")
 
-    # --- 1. Web & Online Tools ---
-    if "youtube" in command or "play" in command:
-        response = play_youtube(command)
-        speak(response)
+    # --- 1. LLM Intent Router (Handles Notes, Tasks, Reminders dynamically) ---
+    intent_response = parse_and_execute(command)
+    if intent_response:
+        return intent_response
 
-    elif "search" in command or "google" in command:
-        response = search_google(command)
-        speak(response)
+    cmd_lower = command.lower().strip()
 
-    elif "website" in command or "dot com" in command or ".com" in command:
-        response = open_website(command)
-        speak(response)
+    # --- 2. Web & Online Tools ---
+    if "youtube" in cmd_lower or "play" in cmd_lower:
+        return play_youtube(command)
 
-    # --- 2. App Launching Commands ---
-    elif "open" in command or "launch" in command:
+    elif "search" in cmd_lower or "google" in cmd_lower:
+        return search_google(command)
+
+    elif "website" in cmd_lower or "dot com" in cmd_lower or ".com" in cmd_lower:
+        return open_website(command)
+
+    # --- 3. App Launching Commands ---
+    elif "open" in cmd_lower or "launch" in cmd_lower:
         for keyword in ["open", "launch"]:
-            if keyword in command:
+            if keyword in cmd_lower:
                 app_name = command.split(keyword)[-1].strip()
-                response = open_app(app_name)
-                speak(response)
-                break
+                return open_app(app_name)
 
-    # --- 3. System Stats & Battery ---
-    elif "battery" in command or "power" in command:
-        status = get_battery_status()
-        speak(status)
+    # --- 4. System Stats & Battery ---
+    elif "battery" in cmd_lower or "power" in cmd_lower:
+        return get_battery_status()
 
-    elif "stats" in command or "cpu" in command or "ram" in command:
-        stats = get_system_stats()
-        speak(stats)
+    elif "stats" in cmd_lower or "cpu" in cmd_lower or "ram" in cmd_lower:
+        return get_system_stats()
 
-    # --- 4. Volume Control ---
-    elif "volume" in command or "mute" in command:
-        response = set_volume(command)
-        speak(response)
+    # --- 5. Volume Control ---
+    elif "volume" in cmd_lower or "mute" in cmd_lower:
+        return set_volume(command)
 
-    # --- 5. Lock Laptop ---
-    elif "lock" in command:
-        speak(lock_system())
+    # --- 6. Lock Laptop ---
+    elif "lock" in cmd_lower:
+        return lock_system()
 
-    # --- 6. Exit / Shutdown Assistant ---
-    elif "exit" in command or "stop" in command or "bye" in command or "quit" in command:
+    # --- 7. Exit / Shutdown Assistant ---
+    elif any(k in cmd_lower for k in ["exit", "stop", "bye", "quit"]):
         speak("Shutting down E.V. systems. Goodbye!")
         sys.exit()
 
-    # --- 7. Fallback to Groq AI Brain ---
+    # --- 8. Fallback to Groq AI Brain ---
     else:
-        response = ask_ai(command)
-        speak(response)
+        return ask_ai(command)
 
 def main():
-    speak("E.V. Virtual Assistant online. Give me a command!")
-    
+    speak("hey boss , what's to build today? ")
+
+    # Startup Briefing: Check pending tasks from workspace.json
+    pending_briefing = get_pending_tasks()
+    if pending_briefing.startswith("You have") and "no pending tasks" not in pending_briefing:
+        speak("just a reminder: You have pending tasks on your list")
+
     while True:
         command = listen()
-        process_command(command)
+        response = process_command(command)
+        if response:
+            speak(response)
 
 if __name__ == "__main__":
     main()
